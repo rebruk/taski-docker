@@ -1,4 +1,3 @@
-# .github/workflows/main.yml
 name: Main Taski workflow
 
 on:
@@ -8,30 +7,36 @@ on:
 
 jobs:
   tests:
-    # Разворачиваем окружение:
     runs-on: ubuntu-latest
-
     steps:
-    # Копируем код проекта
-    - name: Check out code
-      uses: actions/checkout@v3
-    # Устанавливаем Python с помощью action
-    - name: Set up Python
-      uses: actions/setup-python@v4
-    # В action setup-python@v4 передаём параметр — версию Python
-      with:
-        python-version: 3.9
-    # Обновляем pip, устанавливаем flake8 и flake8-isort,
-    # устанавливаем зависимости проекта
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip 
-        pip install flake8==6.0.0 flake8-isort==6.0.0
-    # Запускаем flake8
-    - name: Test with flake8
-      # Вызываем flake8 и указываем ему,
-      # что нужно проверить файлы только в папке backend/
-      run: python -m flake8 backend/
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip 
+          pip install flake8==6.0.0 flake8-isort==6.0.0
+      - name: Test with flake8
+        run: python -m flake8 backend/
+
+      - name: Notify Telegram - tests success
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ✅ Тесты backend успешно пройдены.
+
+      - name: Notify Telegram - tests failure
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ❌ Ошибка в тестах backend.
 
   build_and_push_to_docker_hub:
     name: Push Docker image to DockerHub
@@ -39,10 +44,8 @@ jobs:
     needs: tests
     steps:
       - name: Check out the repo
-        # Получение исходного кода из репозитория
         uses: actions/checkout@v3
       - name: Set up Docker Buildx
-        # Установка сборщика контейнеров Docker
         uses: docker/setup-buildx-action@v2
       - name: Login to Docker
         uses: docker/login-action@v2
@@ -55,29 +58,55 @@ jobs:
           context: ./backend/
           push: true
           tags: ${{ secrets.USERNAME_GIT }}/taski_backend:latest
+
+      - name: Notify Telegram - backend push success
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ✅ Backend image успешно отправлен в DockerHub.
+
+      - name: Notify Telegram - backend push failure
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ❌ Ошибка при пуше backend image.
+
   frontend_tests:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up nodeJS
-      # Это готовый воркфлоу для установки Node.js на раннер
-      uses: actions/setup-node@v3
-      with:
-        # Это параметр воркфлоу, указывающий нужную версию Node.js
-        node-version: 18
+      - uses: actions/checkout@v3
+      - name: Set up nodeJS
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: |
+          cd frontend/
+          npm ci
+      - name: Test frontend
+        run: |
+          cd frontend/
+          npm run test
 
-    - name: Install dependencies
-      # Эта команда устанавливает зависимости для фронтенда
-      run: |
-        cd frontend/
-        npm ci
+      - name: Notify Telegram - frontend tests success
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ✅ Тесты frontend успешно пройдены.
 
-    - name: Test frontend
-      # Запускаем тесты
-      run: |
-        cd frontend/
-        npm run test
+      - name: Notify Telegram - frontend tests failure
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ❌ Ошибка в тестах frontend.
 
   build_frontend_and_push_to_docker_hub:
     name: Push frontend Docker image to DockerHub
@@ -100,6 +129,22 @@ jobs:
           push: true
           tags: ${{ secrets.USERNAME_GIT }}/taski_frontend:latest
 
+      - name: Notify Telegram - frontend push success
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ✅ Frontend image успешно отправлен в DockerHub.
+
+      - name: Notify Telegram - frontend push failure
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ❌ Ошибка при пуше frontend image.
+
   build_gateway_and_push_to_docker_hub:
     name: Push gateway Docker image to DockerHub
     runs-on: ubuntu-latest
@@ -118,24 +163,35 @@ jobs:
         with:
           context: ./gateway/
           push: true
-          # Тут вместо username должен быть ваш логин на Docker Hub
           tags: ${{ secrets.USERNAME_GIT }}/taski_gateway:latest
 
+      - name: Notify Telegram - gateway push success
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ✅ Gateway image успешно отправлен в DockerHub.
+
+      - name: Notify Telegram - gateway push failure
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ❌ Ошибка при пуше gateway image.
 
   deploy:
     runs-on: ubuntu-latest
     needs:
-      # Дождёмся билда всех образов Taski
       - build_and_push_to_docker_hub
       - build_frontend_and_push_to_docker_hub
       - build_gateway_and_push_to_docker_hub
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
-      # Копируем docker-compose.production.yml на продакшен-сервер
       - name: Copy docker-compose.yml via ssh
         uses: appleboy/scp-action@master
-        # Передаём параметры для action appleboy/scp-action:
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
@@ -150,29 +206,27 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          # Параметр script передаёт в action appleboy/ssh-action команды,
-          # которые нужно выполнить на сервере,
-          # с которым установлено соединение
           script: |
             cd taski
-            # Выполняет pull образов с Docker Hub
             sudo docker compose -f docker-compose.production.yml pull
-            # Перезапускает все контейнеры в Docker Compose
             sudo docker compose -f docker-compose.production.yml down
             sudo docker compose -f docker-compose.production.yml up -d
-            # Выполняет миграции и сбор статики
             sudo docker compose -f docker-compose.production.yml exec backend python manage.py migrate
             sudo docker compose -f docker-compose.production.yml exec backend python manage.py collectstatic
-            sudo docker compose -f docker-compose.production.yml exec backend cp -r /app/collected_static/. /backend_static/static/        
+            sudo docker compose -f docker-compose.production.yml exec backend cp -r /app/collected_static/. /backend_static/static/
 
-
-  send_message:
-    runs-on: ubuntu-latest
-    needs: deploy
-    steps:
-      - name: Send message
+      - name: Notify Telegram - deploy success
+        if: success()
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}
-          message: Деплой успешно выполнен!
+          message: ✅ Деплой успешно выполнен!
+
+      - name: Notify Telegram - deploy failure
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: ❌ Ошибка при деплое.
